@@ -38,6 +38,10 @@ namespace FileTransferTool
             Console.WriteLine($"Size: {info.Length:N0} bytes");
             Console.WriteLine($"Destination: {Path.GetFullPath(destination)}");
 
+            int chunkSize = 4 * 1024 * 1024;
+            ChunkHasher hasher = new ChunkHasher(chunkSize);
+            hasher.ProcessFile(source);
+
             return 0;
         }
     }
