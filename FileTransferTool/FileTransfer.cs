@@ -2,28 +2,30 @@
 
 namespace FileTransferTool
 {
-    internal class ChunkHasher
+    internal class FileTransfer
     {
         private readonly int chunkSize;
 
-        public ChunkHasher(int chunkSize)
+        public FileTransfer(int chunkSize)
         {
             this.chunkSize = chunkSize;
         }
 
-        public void ProcessFile(string source)
+        public void ProcessFile(string source,string destination)
         {
-            using (FileStream stream = new FileStream(source, FileMode.Open, FileAccess.Read))
+            using (FileStream sourceStream = new FileStream(source, FileMode.Open, FileAccess.Read))
+            using (FileStream destinationStream = new FileStream(destination, FileMode.Create, FileAccess.Write))
             using (MD5 md5 = MD5.Create())
             {
                 byte[] buffer = new byte[chunkSize];
                 long position = 0;
                 int blockNumber = 1;
                 int bytesRead;
-                while((bytesRead = stream.Read(buffer, 0, buffer.Length)) > 0)
+                while((bytesRead = sourceStream.Read(buffer, 0, buffer.Length)) > 0)
                 {
                     byte[] hash = md5.ComputeHash(buffer, 0, bytesRead);
                     string hashText = BitConverter.ToString(hash);
+                    destinationStream.Write(buffer, 0, bytesRead);
                     Console.WriteLine($"blockNumber {blockNumber}: position = {position}, size = {bytesRead}, hash = {hashText}");
                     position += bytesRead;
                     blockNumber++;

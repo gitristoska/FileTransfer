@@ -31,6 +31,9 @@ namespace FileTransferTool
                 return 1;
             }
 
+            Directory.CreateDirectory(destination);
+            destination = Path.Combine(destination,Path.GetFileName(source));
+
             FileInfo info = new FileInfo(source);
 
             Console.WriteLine();
@@ -39,8 +42,8 @@ namespace FileTransferTool
             Console.WriteLine($"Destination: {Path.GetFullPath(destination)}");
 
             int chunkSize = 4 * 1024 * 1024;
-            ChunkHasher hasher = new ChunkHasher(chunkSize);
-            hasher.ProcessFile(source);
+            FileTransfer transfer = new FileTransfer(chunkSize);
+            transfer.ProcessFile(source,destination);
 
             return 0;
         }
