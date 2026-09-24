@@ -48,12 +48,21 @@ namespace FileTransferTool
             string hashSource = transfer.GetHash(source);
             string hashDestination = transfer.GetHash(destination);
 
-            if (hashSource.CompareTo(hashDestination) == 0)
-                Console.WriteLine("checksum match");
+            Console.WriteLine();
+            Console.WriteLine($"Source SHA256: {hashSource}");
+            Console.WriteLine($"Destination SHA256: {hashDestination}");
+
+            if (hashSource == hashDestination)
+            {
+                Console.WriteLine("Checksum match");
+                return 0;
+            }
             else
-                Console.WriteLine("checksum dont match");
-            
-            return 0;
+            {
+
+                Console.WriteLine("Checksum don't match");
+                return 1;
+            }
         }
     }
 }

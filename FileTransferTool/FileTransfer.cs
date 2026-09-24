@@ -28,13 +28,28 @@ namespace FileTransferTool
                 {
                     byte[] sourceHash = md5.ComputeHash(buffer, 0, bytesRead);
                     string sourceHashText = BitConverter.ToString(sourceHash);
-                    destinationStream.Write(buffer, 0, bytesRead);
 
-                    destinationStream.Position = position;
-                    destinationStream.ReadExactly(verifybuffer,0,bytesRead);
-                    byte[] destinationHash = md5.ComputeHash(verifybuffer,0,bytesRead);
-                    bool verified = sourceHash.SequenceEqual(destinationHash);
-                    Console.WriteLine($"blockNumber {blockNumber}: position = {position}, size = {bytesRead}, hash = {sourceHashText}, verified = {verified}");
+                    bool verify = false;
+                    int attempt = 0;
+
+                    while(!verify && attempt < 3)
+                    {
+                        attempt++;
+                        destinationStream.Position = position;
+                        destinationStream.Write(buffer, 0, bytesRead);
+
+                        destinationStream.Position = position;
+                        destinationStream.ReadExactly(verifybuffer, 0, bytesRead);
+
+                        byte[] destinationHash = md5.ComputeHash(verifybuffer, 0, bytesRead);
+                        verify = sourceHash.SequenceEqual(destinationHash);
+                    }
+                    if (!verify)
+                    {
+                        throw new IOException($"Block failed. Block number = {blockNumber}, position = {position}");
+                    }
+                    
+                    Console.WriteLine($"blockNumber {blockNumber}: position = {position}, size = {bytesRead}, hash = {sourceHashText}, attempts = {attempt}");
                     position += bytesRead;
                     blockNumber++;
                 }
