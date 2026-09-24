@@ -45,6 +45,14 @@ namespace FileTransferTool
             FileTransfer transfer = new FileTransfer(chunkSize);
             transfer.ProcessFile(source,destination);
 
+            string hashSource = transfer.GetHash(source);
+            string hashDestination = transfer.GetHash(destination);
+
+            if (hashSource.CompareTo(hashDestination) == 0)
+                Console.WriteLine("checksum match");
+            else
+                Console.WriteLine("checksum dont match");
+            
             return 0;
         }
     }
