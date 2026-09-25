@@ -32,7 +32,7 @@ namespace FileTransferTool
             }
 
             Directory.CreateDirectory(destination);
-            destination = Path.Combine(destination,Path.GetFileName(source));
+            destination = Path.Combine(destination, Path.GetFileName(source));
 
             FileInfo info = new FileInfo(source);
 
@@ -42,8 +42,13 @@ namespace FileTransferTool
             Console.WriteLine($"Destination: {Path.GetFullPath(destination)}");
 
             int chunkSize = 4 * 1024 * 1024;
-            FileTransfer transfer = new FileTransfer(chunkSize);
-            transfer.ProcessFile(source,destination);
+            int concurrency = 4;
+            FileTransfer transfer = new FileTransfer(chunkSize, concurrency);
+            ChunkResult[] results = transfer.ProcessFile(source, destination);
+            foreach (ChunkResult chunkResult in results)
+            {
+                Console.WriteLine($"block number {chunkResult.BlockNumber} at position {chunkResult.Position} size={chunkResult.Size},hash={BitConverter.ToString(chunkResult.Hash)},attempts={chunkResult.Attempts}");
+            }
 
             string hashSource = transfer.GetHash(source);
             string hashDestination = transfer.GetHash(destination);
