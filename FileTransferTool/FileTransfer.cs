@@ -1,4 +1,5 @@
-﻿using System.Security.Cryptography;
+﻿using Microsoft.Win32.SafeHandles;
+using System.Security.Cryptography;
 
 namespace FileTransferTool
 {
@@ -13,46 +14,52 @@ namespace FileTransferTool
 
         public void ProcessFile(string source,string destination)
         {
-            using (FileStream sourceStream = new FileStream(source, FileMode.Open, FileAccess.Read))
-            using (FileStream destinationStream = new FileStream(destination, FileMode.Create, FileAccess.ReadWrite))
-            using (MD5 md5 = MD5.Create())
-            {
+            using SafeFileHandle sourceStream = File.OpenHandle(source, FileMode.Open, FileAccess.Read, FileShare.Read);
+            long length = RandomAccess.GetLength(sourceStream);
+
+            using SafeFileHandle destinationStream = File.OpenHandle(destination, FileMode.Create, FileAccess.ReadWrite,FileShare.None,preallocationSize:length);
+            using MD5 md5 = MD5.Create();
                 byte[] buffer = new byte[chunkSize];
                 byte[] verifybuffer = new byte[chunkSize];
+                long chunksCount = (int)((length+chunkSize-1)/chunkSize);
+            for (int i = 0; i < chunksCount; i++)
+            {
+                long position = (long)i* chunkSize;
+                int size = (int)Math.Min(chunkSize,length-position);
+                ReadExactly(sourceStream, buffer, size, position);
+                byte[] sourceHash = md5.ComputeHash(buffer, 0, size);
+                string sourceHashText = BitConverter.ToString(sourceHash);
 
-                long position = 0;
-                int blockNumber = 1;
-                int bytesRead;
+                bool verify = false;
+                int attempt = 0;
 
-                while((bytesRead = sourceStream.Read(buffer, 0, buffer.Length)) > 0)
+                while (!verify && attempt < 3)
                 {
-                    byte[] sourceHash = md5.ComputeHash(buffer, 0, bytesRead);
-                    string sourceHashText = BitConverter.ToString(sourceHash);
-
-                    bool verify = false;
-                    int attempt = 0;
-
-                    while(!verify && attempt < 3)
-                    {
-                        attempt++;
-                        destinationStream.Position = position;
-                        destinationStream.Write(buffer, 0, bytesRead);
-
-                        destinationStream.Position = position;
-                        destinationStream.ReadExactly(verifybuffer, 0, bytesRead);
-
-                        byte[] destinationHash = md5.ComputeHash(verifybuffer, 0, bytesRead);
-                        verify = sourceHash.SequenceEqual(destinationHash);
-                    }
-                    if (!verify)
-                    {
-                        throw new IOException($"Block failed. Block number = {blockNumber}, position = {position}");
-                    }
-                    
-                    Console.WriteLine($"blockNumber {blockNumber}: position = {position}, size = {bytesRead}, hash = {sourceHashText}, attempts = {attempt}");
-                    position += bytesRead;
-                    blockNumber++;
+                    attempt++;
+                    RandomAccess.Write(destinationStream, buffer.AsSpan(0, size), position);
+                    ReadExactly(destinationStream, verifybuffer,size, position);
+                    byte[] destinationHash = md5.ComputeHash(verifybuffer, 0,size);
+                    verify = sourceHash.SequenceEqual(destinationHash);
                 }
+                if (!verify)
+                {
+                    throw new IOException($"Block failed. Block number = {i+1}, position = {position}");
+                }
+
+                Console.WriteLine($"blockNumber {i+1}: position = {position}, size = {size}, hash = {sourceHashText}, attempts = {attempt}");
+            }
+        }
+        private void ReadExactly(SafeFileHandle handle, byte[] buffer ,int count, long position)
+        {
+            int total = 0;
+            while (total < count)
+            {
+                int read = RandomAccess.Read(handle, buffer.AsSpan(total,count-total),position+total); 
+                if(read == 0)
+                {
+                    throw new EndOfStreamException($"Unexpected end of file at position {position+total}");
+                }
+                total += read;
             }
         }
         public string GetHash(string path)
