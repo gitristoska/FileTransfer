@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.IO;
 
 namespace FileTransferTool
@@ -44,11 +45,21 @@ namespace FileTransferTool
             int chunkSize = 4 * 1024 * 1024;
             int concurrency = 4;
             FileTransfer transfer = new FileTransfer(chunkSize, concurrency);
+
+            Stopwatch watch = Stopwatch.StartNew();
             ChunkResult[] results = transfer.ProcessFile(source, destination);
+            watch.Stop();
+
             foreach (ChunkResult chunkResult in results)
             {
                 Console.WriteLine($"block number {chunkResult.BlockNumber} at position {chunkResult.Position} size={chunkResult.Size},hash={BitConverter.ToString(chunkResult.Hash)},attempts={chunkResult.Attempts}");
             }
+
+            double seconds = watch.Elapsed.TotalSeconds;
+            double megabytes = info.Length / 1024.0 / 1024.0;
+
+            Console.WriteLine();
+            Console.WriteLine($"Copied {megabytes:N1} MB in {seconds:F2} seconds");
 
             string hashSource = transfer.GetHash(source);
             string hashDestination = transfer.GetHash(destination);
