@@ -89,6 +89,7 @@ namespace FileTransferTool
                 total += read;
             }
         }
+
         public string GetHash(string path)
         {
             using (FileStream stream = new FileStream(path, FileMode.Open, FileAccess.Read))
@@ -97,6 +98,27 @@ namespace FileTransferTool
                 byte[] hash = sha256.ComputeHash(stream);
                 return BitConverter.ToString(hash);
             }
+        }
+
+        public static int CalculateConcurrency()
+        {
+            return Math.Clamp(Environment.ProcessorCount, 2, 8);
+        }
+
+        public static int CalculateChunkSize(long fileSize, int concurrency)
+        {
+            int preferred = 4 * 1024 * 1024;
+            int min = 64 * 1024;
+            long maxForBalance = fileSize / (concurrency * 8L);
+            if (maxForBalance < min)
+            {
+                return min;
+            }
+            if (maxForBalance > preferred)
+            {
+                return preferred;
+            }
+            return (int)maxForBalance;
         }
     }
 }

@@ -8,75 +8,108 @@ namespace FileTransferTool
     {
         static int Main(string[] args)
         {
-            Console.Write("Enter source file path: ");
-            string source = (Console.ReadLine() ?? string.Empty).Trim();
-
-            if (string.IsNullOrWhiteSpace(source))
+            try
             {
-                Console.WriteLine("No source file specified.");
-                return 1;
+                //benchmark
+                if (args.Length > 0 && args[0] == "benchmark")
+                {
+                    if (args.Length < 2)
+                    {
+                        Console.WriteLine("Usage: FileTransferTool benchmark <source file> [destination folder]");
+                        return 1;
+                    }
+
+                    if (!File.Exists(args[1]))
+                    {
+                        Console.WriteLine($"Source file not found: {args[1]}");
+                        return 1;
+                    }
+
+                    string folder = args.Length > 2 ? args[2] : Path.GetTempPath();
+
+                    new Benchmark().Run(args[1], folder);
+                    return 0;
+                }
+
+                Console.Write("Enter source file path: ");
+                string source = (Console.ReadLine() ?? string.Empty).Trim();
+
+                if (string.IsNullOrWhiteSpace(source))
+                {
+                    Console.WriteLine("No source file specified.");
+                    return 1;
+                }
+
+                if (!File.Exists(source))
+                {
+                    Console.WriteLine($"Source file not found: {source}");
+                    return 1;
+                }
+
+                Console.Write("Enter destination path: ");
+                string destination = (Console.ReadLine() ?? string.Empty).Trim();
+
+                if (string.IsNullOrWhiteSpace(destination))
+                {
+                    Console.WriteLine("No destination specified.");
+                    return 1;
+                }
+
+                Directory.CreateDirectory(destination);
+                destination = Path.Combine(destination, Path.GetFileName(source));
+
+                FileInfo info = new FileInfo(source);
+
+                Console.WriteLine();
+                Console.WriteLine($"Source: {info.FullName}");
+                Console.WriteLine($"Size: {info.Length:N0} bytes");
+                Console.WriteLine($"Destination: {Path.GetFullPath(destination)}");
+
+                int concurrency = FileTransfer.CalculateConcurrency();
+                int chunkSize = FileTransfer.CalculateChunkSize(info.Length, concurrency);
+                Console.WriteLine($"Chunk size: {chunkSize / 1024} KB");
+                Console.WriteLine($"Workers: {concurrency}");
+
+                FileTransfer transfer = new FileTransfer(chunkSize, concurrency);
+
+                Stopwatch watch = Stopwatch.StartNew();
+                ChunkResult[] results = transfer.ProcessFile(source, destination);
+                watch.Stop();
+
+                foreach (ChunkResult chunkResult in results)
+                {
+                    Console.WriteLine($"block number {chunkResult.BlockNumber} at position {chunkResult.Position} size={chunkResult.Size},hash={BitConverter.ToString(chunkResult.Hash)},attempts={chunkResult.Attempts}");
+                }
+
+                double seconds = watch.Elapsed.TotalSeconds;
+                double megabytes = info.Length / 1024.0 / 1024.0;
+
+                Console.WriteLine();
+                Console.WriteLine($"Copied {megabytes:N1} MB in {seconds:F2} seconds");
+                double throughput = megabytes / seconds;
+                Console.WriteLine($"Throughput: {throughput:N1} MB/s");
+
+                string hashSource = transfer.GetHash(source);
+                string hashDestination = transfer.GetHash(destination);
+
+                Console.WriteLine();
+                Console.WriteLine($"Source SHA256: {hashSource}");
+                Console.WriteLine($"Destination SHA256: {hashDestination}");
+
+                if (hashSource == hashDestination)
+                {
+                    Console.WriteLine("Checksum match");
+                    return 0;
+                }
+                else
+                {
+                    Console.WriteLine("Checksum don't match");
+                    return 1;
+                }
             }
-
-            if (!File.Exists(source))
+            catch (Exception ex)
             {
-                Console.WriteLine($"Source file not found: {source}");
-                return 1;
-            }
-
-            Console.Write("Enter destination path: ");
-            string destination = (Console.ReadLine() ?? string.Empty).Trim();
-
-            if (string.IsNullOrWhiteSpace(destination))
-            {
-                Console.WriteLine("No destination specified.");
-                return 1;
-            }
-
-            Directory.CreateDirectory(destination);
-            destination = Path.Combine(destination, Path.GetFileName(source));
-
-            FileInfo info = new FileInfo(source);
-
-            Console.WriteLine();
-            Console.WriteLine($"Source: {info.FullName}");
-            Console.WriteLine($"Size: {info.Length:N0} bytes");
-            Console.WriteLine($"Destination: {Path.GetFullPath(destination)}");
-
-            int chunkSize = 4 * 1024 * 1024;
-            int concurrency = 4;
-            FileTransfer transfer = new FileTransfer(chunkSize, concurrency);
-
-            Stopwatch watch = Stopwatch.StartNew();
-            ChunkResult[] results = transfer.ProcessFile(source, destination);
-            watch.Stop();
-
-            foreach (ChunkResult chunkResult in results)
-            {
-                Console.WriteLine($"block number {chunkResult.BlockNumber} at position {chunkResult.Position} size={chunkResult.Size},hash={BitConverter.ToString(chunkResult.Hash)},attempts={chunkResult.Attempts}");
-            }
-
-            double seconds = watch.Elapsed.TotalSeconds;
-            double megabytes = info.Length / 1024.0 / 1024.0;
-
-            Console.WriteLine();
-            Console.WriteLine($"Copied {megabytes:N1} MB in {seconds:F2} seconds");
-
-            string hashSource = transfer.GetHash(source);
-            string hashDestination = transfer.GetHash(destination);
-
-            Console.WriteLine();
-            Console.WriteLine($"Source SHA256: {hashSource}");
-            Console.WriteLine($"Destination SHA256: {hashDestination}");
-
-            if (hashSource == hashDestination)
-            {
-                Console.WriteLine("Checksum match");
-                return 0;
-            }
-            else
-            {
-
-                Console.WriteLine("Checksum don't match");
+                Console.WriteLine($"Error: {ex.Message}");
                 return 1;
             }
         }

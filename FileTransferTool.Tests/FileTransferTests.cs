@@ -47,6 +47,20 @@ namespace FileTransferTool.Tests
         }
 
         [Fact]
+        public void FileExactlyOneChunkProducesOneChunk()
+        {
+            string source = CreateSourceFile("exact.bin", ChunkSize);
+            string destination = DestinationFor("exact.bin");
+
+            FileTransfer transfer = new FileTransfer(ChunkSize, 4);
+            ChunkResult[] results = transfer.ProcessFile(source, destination);
+
+            Assert.Single(results);
+            Assert.Equal(0, results[0].Position);
+            Assert.Equal(ChunkSize, results[0].Size);
+        }
+
+        [Fact]
         public void FileSmallerThanOneChunkProducesOneChunk()
         {
             string source = CreateSourceFile("small.bin", 1000);
@@ -141,6 +155,37 @@ namespace FileTransferTool.Tests
                 Assert.Equal(sequential[i].Size, parallel[i].Size);
                 Assert.Equal(sequential[i].Hash, parallel[i].Hash);
             }
+        }
+        [Fact]
+        public void LargeFileUsesThePreferredChunkSize()
+        {
+            long twoGigabytes = 2L * 1024 * 1024 * 1024;
+
+            Assert.Equal(4 * 1024 * 1024, FileTransfer.CalculateChunkSize(twoGigabytes, 8));
+        }
+
+        [Fact]
+        public void SmallFileUsesSmallerChunksSoEveryWorkerGetsWork()
+        {
+            long fileSize = 8 * 1024 * 1024;
+            int chunkSize = FileTransfer.CalculateChunkSize(fileSize, 8);
+
+            Assert.True(chunkSize < 4 * 1024 * 1024);
+            Assert.True(fileSize / chunkSize >= 8);
+        }
+
+        [Fact]
+        public void ChunkSizeNeverGoesBelowTheMinimum()
+        {
+            Assert.Equal(64 * 1024, FileTransfer.CalculateChunkSize(1000, 8));
+        }
+
+        [Fact]
+        public void ConcurrencyStaysWithinTheMeasuredRange()
+        {
+            int concurrency = FileTransfer.CalculateConcurrency();
+
+            Assert.InRange(concurrency, 2, 8);
         }
     }
 }
